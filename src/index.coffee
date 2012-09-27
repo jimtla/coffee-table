@@ -1,4 +1,5 @@
 express = require 'express'
+stylus = require 'stylus'
 assets = require 'connect-assets'
 _ = require 'underscore'
 url = require 'url'
@@ -17,8 +18,7 @@ app.use express.static(process.cwd() + '/public')
 # Set View Engine
 app.set 'view engine', 'jade'
 
-(require './routes') app
-(require './square') app
+(require './edit') app
 
 # Start Server
 port = process.env.PORT ? process.env.VMC_APP_PORT ? 3000
