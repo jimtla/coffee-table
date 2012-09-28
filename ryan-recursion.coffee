@@ -1,44 +1,50 @@
-check = (cond, msg) -> cond || throw new Error msg
-checkEq = (a, b, msg) -> check b is a, "#{msg ? "-"}: #{b} isnt #{a}"
-checkArrayEq = (a, b, msg) -> check "#{b}" is "#{a}", "#{msg ? "-"}: #{b} isnt #{a} (!!! HACKY !!!)"
+check = (cond, msg) ->
+  throw new Error msg unless cond
+checkEq = (a, b, msg) ->
+  check b is a, "#{msg ? "-"}: #{b} isnt #{a}"
+checkArrayEq = (a, b, msg) ->
+  check "#{b}" is "#{a}", "#{msg ? "-"}: #{b} isnt #{a} (!!! HACKY !!!)"
 
-buildGraph = (cliques) ->
+buildGetNeighbors = (cliques) ->
   map = {}
-  map[n] = {} for n in clique for clique in cliques
-  map[n][m] = true for m in c when m isnt n for n in c for c in cliques
-  return (vertex) -> (k for k, _ of map[vertex] ? {})
+  for clique in cliques
+    for n in clique
+      map[n] or= {}
+      for m in clique when m isnt n
+        map[n][m] = true
+  (vertex) ->
+    k for k of map[vertex] ? {}
 
-shortestPathAssumingReachable = (start, end, graph) ->
+shortestPathAssumingReachable = (start, end, getNeighbors) ->
   level = []
-  newLevel = () ->
-    oldLevel = level
-    level = []
-    return oldLevel
   tree = {}
-  seen = (n) -> tree[n] isnt undefined
-  see = (n, pathSoFar) ->
-    unless seen n
+  visit = (n, pathSoFar) ->
+    unless tree[n]?
       tree[n] = [n]
       tree[n].unshift pathSoFar...
       level.push n
-  see start, []
-  see n, tree[parent] for n in graph parent for parent in newLevel() until seen end
-  return tree[end]
+  visit start, []
+  until tree[end]?
+    parentLevel = level
+    level = []
+    for parent in parentLevel
+      for n in getNeighbors parent
+        visit n, tree[parent]
+  tree[end]
 
-(->
-  graph = buildGraph [[0, 1], [0, 2], [1, 3, 4], [2, 3]]
-  checkArrayEq [1, 2], graph 0
-  checkArrayEq [0, 3, 4], graph 1
-  checkArrayEq [], graph 5
-  checkArrayEq [0, 1, 4], shortestPathAssumingReachable 0, 4, graph
-)()
+do ->
+  getNeighbors = buildGetNeighbors [[0, 1], [0, 2], [1, 3, 4], [2, 3]]
+  checkArrayEq [1, 2], getNeighbors 0
+  checkArrayEq [0, 3, 4], getNeighbors 1
+  checkArrayEq [], getNeighbors 5
+  checkArrayEq [0, 1, 4], shortestPathAssumingReachable 0, 4, getNeighbors
 
-syllabus = (->
-  T = 'T' # top level of the diagram
+getRecursiveNeighbors = do ->
+  T = ''  # top level of the diagram
   A = 'A'
   B = 'B'
   C = 'C'
-  diagram = buildGraph [
+  getNonRecursiveNeighbors = buildGetNeighbors [
     [[T, 0], [A, 0], [T, 14], [T, 15]]
     [[T, 1], [A, 3]]
     [[T, 2], [A, 4], [B, 6], [C, 0], [T, 11]]
@@ -56,27 +62,28 @@ syllabus = (->
     [[B, 13], [C, 14]]
     [[C, 6], [C, 7]]
   ]
-  (vertexString) ->
-    vertex = vertexString.split ','
+  (recursiveVertex) ->
+    vertex = recursiveVertex.split ','
     pos = vertex[1]
-    levels = vertex[0]
-    check levels.length > 0
+    stack = vertex[0]
+    check stack.length > 0
     neighbors = {}
-    addNeighbors = (diagramVertex, levelsSuffix) ->
-      for n in diagram diagramVertex
-        n = n.split(',')
-        newLevels = (if n[0] is T then '' else n[0]) + levelsSuffix
-        neighbors[[newLevels, n[1]]] = true unless newLevels.length is 0
-    addNeighbors [T, pos], levels
-    addNeighbors [levels[0], pos], levels[1..]
-    return (k for k, _ of neighbors)
-)()
-(->
-  expectNeighbors = (vertex, expectedNeighbors) ->
-    neighbors = syllabus vertex
-    check n in neighbors, "#{n} in (syllabus #{vertex})" for n in expectedNeighbors
-    checkEq expectedNeighbors.length, neighbors.length, "[#{neighbors}] vs. [#{expectedNeighbors}]"
+    addNeighbors = (nonRecursiveVertex, oldStack) ->
+      for n in getNonRecursiveNeighbors nonRecursiveVertex
+        n = n.split ','
+        unless oldStack is '' and n[0] is T
+          neighbors[[n[0] + oldStack, n[1]]] = true
+    addNeighbors [T, pos], stack
+    addNeighbors [stack[0], pos], stack[1..]
+    k for k of neighbors
+
+do ->
+  expectNeighbors = (vertex, expected) ->
+    actual = getRecursiveNeighbors vertex
+    for n in expected
+      check n in actual, "#{n} in (getRecursiveNeighbors #{vertex})"
+    checkEq expected.length, actual.length, "[#{actual}] vs. [#{expected}]"
   expectNeighbors "A,0", ["AA,0", "A,14", "A,15"]
   expectNeighbors "AC,4", ["BAC,3", "C,2", "BC,6", "CC,0", "C,11" ]
-)()
-console.log shortestPathAssumingReachable "C,9", "A,11", syllabus
+
+console.log shortestPathAssumingReachable "C,9", "A,11", getRecursiveNeighbors
