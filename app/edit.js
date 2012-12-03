@@ -19,26 +19,41 @@ module.exports = function(app) {
       return null;
     }
   };
-  app.get(/^\/edit\/(.+)/, function(req, res) {
-    var file, target;
+  app.get(/^\/edit\/(.*)/, function(req, res) {
+    var file, readFile, target;
     file = req.params[0];
     target = make_absolute(file);
     if (target != null) {
-      return fs.readFile(target, function(err, contents) {
-        if (err) {
-          if (err.code === 'ENOENT') {
+      readFile = function() {
+        return fs.readFile(target, function(err, contents) {
+          if (err) {
+            if (err.code === 'ENOENT') {
+              return res.render('edit', {
+                file: file,
+                contents: ''
+              });
+            } else {
+              return res.send(400, err);
+            }
+          } else {
             return res.render('edit', {
               file: file,
-              contents: ''
+              contents: contents
             });
-          } else {
-            return res.send(400, err);
           }
-        } else {
-          return res.render('edit', {
-            file: file,
-            contents: contents
+        });
+      };
+      return fs.stat(target, function(err, stat) {
+        if (!err && stat.isDirectory()) {
+          return fs.readdir(target, function(err, files) {
+            if (err) {
+              return readFile();
+            } else {
+              return res.send(200, files);
+            }
           });
+        } else {
+          return readFile();
         }
       });
     } else {
