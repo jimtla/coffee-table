@@ -53,13 +53,15 @@ app.add_module 'editor', ->
 
     normalize_cursor = (state) ->
         # Make sure the cursor is between 0 and EOL
-        old_column = state.cursor.col
-        current_line = state.buffer[state.cursor.line] ? ''
+        new_line =
+            Math.min (Math.max 0, state.cursor.line), state.buffer.length - 1
+        console.log new_line
+        current_line = state.buffer[new_line]
         new_column =
-            Math.min (Math.max 0, old_column), current_line.length
+            Math.min (Math.max 0, state.cursor.col), current_line.length
 
         cursor:
-            line: state.cursor.line
+            line: new_line
             col: new_column
         buffer: state.buffer
 
@@ -72,7 +74,7 @@ app.add_module 'editor', ->
                 else
                     state
 
-            move_cursor normalized_state,  lines, cols
+            normalize_cursor move_cursor state, lines, cols
 
         insert_string_at_cursor: ({string}, state) ->
             normalized_state = normalize_cursor state
@@ -152,11 +154,11 @@ app.add_module 'editor', ->
         render_line = (line, line_number, cursor_col=null) ->
             contents =
                 if cursor_col?
-                    line[...cursor_col] +
+                    _.escape(line[...cursor_col]) +
                     "<span class='cursor'><div class='the-cursor'></div></span>" +
-                    line[cursor_col...]
+                    _.escape line[cursor_col...]
                 else
-                    line
+                    _.escape line
             "<div class='line'><span class='number'>#{line_number}</span><span class='contents'>#{contents}</span></div>"
 
         render = ({buffer, cursor}) ->
@@ -188,6 +190,17 @@ app.add_module 'editor', ->
         refresh = -> node.html render state
         do refresh
 
+        scroll_to_cursor = ->
+            padding = 50
+            cursor_top = node.find('.cursor').offset().top
+            scroll_top = $(window).scrollTop()
+            window_height = $(window).height()
+
+            if cursor_top - padding < scroll_top
+                $(window).scrollTop cursor_top - padding
+            else if cursor_top > scroll_top + window_height - padding
+                $(window).scrollTop cursor_top + padding - window_height
+
         ($ window).on 'keydown', (e) ->
             $('.last-keypress').text e.which
             [action, args] = action_of_key e.which,
@@ -199,7 +212,8 @@ app.add_module 'editor', ->
             if action?
                 state = action args, state
                 save state
-                refresh()
+                do refresh
+                do scroll_to_cursor
                 false
             else
                 true
