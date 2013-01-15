@@ -44,6 +44,15 @@ app.add_module 'editor', ->
             normalize_line: lines != 0
             normalize_col : cols != 0).cursor
 
+    goto_line = (line) -> (state) ->
+        enter_mode('command') normalize_cursor make_state state, {cursor: {line}},
+            normalize_line: true
+            normalize_col: false
+
+    move_cursor_end_of_file = (state) ->
+        line: state.buffer.length - 1
+        col:  state.cursor.col
+
     insert_string_at_cursor = ({string}) -> (state) ->
         normalized_state = normalize_cursor state
         new_buffer = _(state.buffer).clone()
@@ -314,11 +323,14 @@ app.add_module 'editor', ->
     register_command 'delete' , 'd', delete_current_line
     register_command 'command', 'c', enter_mode 'change'
     register_command 'change' , 'c', change_current_line
+    register_command 'command', 'g', enter_mode 'goto'
+    register_command 'goto'   , 'g', goto_line 0
 
     register_command 'movement', 'h', move_cursor {lines:  0, cols: -1}
     register_command 'movement', 'l', move_cursor {lines:  0, cols:  1}
     register_command 'movement', 'j', move_cursor {lines:  1, cols:  0}
     register_command 'movement', 'k', move_cursor {lines: -1, cols:  0}
+    register_command 'movement', 'G', move_cursor_end_of_file
 
     register_command 'insert' , 'ESC', enter_mode 'command'
 
@@ -422,9 +434,7 @@ app.add_module 'editor', ->
         do -> # Handle exec window
             colon_cmd = (command, state) ->
                 if command == parseInt(command).toString()
-                    normalize_cursor make_state state, {cursor: {line: parseInt command}},
-                        normalize_line: true
-                        normalize_col: false
+                    goto_line(parseInt command) state
                 else
                     state
 
