@@ -7,9 +7,19 @@
       position absolute
       top 0
       left 0
-      border-left 2px solid gray
-      width 1px
       height 15px
+      &.insert
+        border-left 2px solid gray
+        width 1px
+      &.command
+        background-color: #80808080
+      &.delete
+        background-color: #f0808080
+      &.change
+        background-color: #8080f080
+      &.goto
+        background-color: #80f08080
+
 
   .line
     .number
@@ -24,3 +34,10 @@
     font-size 12px
     font-weight normal
     padding-left 10px
+
+.exec-container
+  position: fixed
+  bottom: 0
+  display: none
+  .exec
+    width: 100%
