@@ -3,4 +3,6 @@ block content
   .container.page-wrap
     h1.filename=file
       span.last-keypress
-    pre.editor=contents
+    pre.editor(tabindex="1")=contents
+    pre.exec-container.container
+      input.exec(type='text')
