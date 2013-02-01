@@ -111,5 +111,71 @@ describe 'buf', ->
     type 'dl'
     contents 'L'
 
-# TODO(ryandm): test newline inserted in the middle of a line
-# TODO(ryandm): extract the buffer proper, a line/col view of a file
+  it 'understands <BS>, A, 0/$, o/O, <UP>, <DOWN>', ->
+    type 'ihello<bs><bs>'
+    contents 'hel'
+    cursor 0, 3
+    type 'ium<esc>i<bs>'
+    contents 'helim'
+    type 'u<esc>A!'
+    contents 'helium!'
+    type '<bs><esc>hhi'
+    cursor 0, 3
+    type '<esc>oargon<esc>'
+    contents 'helium\nargon'
+    cursor 1, 4
+    type 'A~~~'
+    cursor 1, 8
+    type '<UP>'
+    cursor 0, 6
+    type '<DOWN>'
+    cursor 1, 8
+    type '<UP><LEFT><DOWN>'
+    cursor 1, 5
+    type '<esc>0i~~~<esc>'
+    contents 'helium\n~~~argon~~~'
+    type 'Oneon'
+    contents 'helium\nneon\n~~~argon~~~'
+    cursor 1, 4
+    type '<down><esc>'
+    cursor 2, 3
+    type '$'
+    cursor 2, 10
+
+  it 'understands dj, dk, dgg', ->
+    type 'ihello<cr>world<cr>wide<cr>web<esc>'
+    contents 'hello\nworld\nwide\nweb'
+    type 'kkj'
+    cursor 2, 2
+    type 'dji, '
+    contents 'hello\n, world'
+    cursor 1, 2
+    type '<bs><bs><esc>Ocruel<esc>'
+    contents 'hello\ncruel\nworld'
+    cursor 1, 4
+    type 'dk'
+    contents 'world'
+    cursor 0, 0
+    type 'ohow are you<cr>goodbye<cr><esc>kkl'
+    cursor 1, 1
+    type 'dgx'
+    contents 'world\nhow are you\ngoodbye\n'
+    cursor 1, 1
+    type 'dgg'
+    contents 'goodbye\n'
+    cursor 0, 0
+
+  it 'understands G, dG, d0, d$', ->
+    type 'ihello<cr>world<cr>goodbye<cr>cruel<cr>world<esc>kk'
+    cursor 2, 4
+    type 'd$'
+    contents 'hello\nworld\ngood\ncruel\nworld'
+    cursor 2, 3
+    type 'G'
+    cursor 4, 0
+    type 'kkl'
+    cursor 2, 1
+    type 'ld0'
+    contents 'hello\nworld\nod\ncruel\nworld'
+    type 'dG'
+    contents 'hello\nworld'

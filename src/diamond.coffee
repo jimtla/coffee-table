@@ -5,6 +5,9 @@ keys =
   ESC: '<ESC>'
   LEFT: '<LEFT>'
   RIGHT: '<RIGHT>'
+  BS: '<BS>'
+  UP: '<UP>'
+  DOWN: '<DOWN>'
 
 exports[k] = v for k, v of keys
 

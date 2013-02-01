@@ -10,7 +10,7 @@ id = function(x) {
 };
 
 exports.create = function() {
-  var bindings_, contents_, modes_, omap_, type_;
+  var bindings_, contents_, modes_, omap_, omap_is_prefix_, type_, type_unshift_, with_movement_, _ref;
   contents_ = (function() {
     var after_fixing_cursor, col, col_max_adjustment, fixed_cursor, line, lines;
     lines = [[]];
@@ -31,23 +31,56 @@ exports.create = function() {
     };
     return id({
       insert_char: function(c) {
-        return after_fixing_cursor(function() {
-          lines[line].splice(++col - 1, 0, c);
-          if (c === diamond.CR) {
-            lines.splice(++line, 0, []);
-            return col = 0;
+        if (c === diamond.BS) {
+          return after_fixing_cursor(function() {
+            if (col !== 0) {
+              lines[line].splice(col - 1, 1);
+              return col--;
+            }
+          });
+        } else if (c === diamond.LEFT) {
+          return after_fixing_cursor(function() {
+            return col--;
+          });
+        } else if (c === diamond.RIGHT) {
+          return after_fixing_cursor(function() {
+            return col++;
+          });
+        } else if (c === diamond.UP) {
+          if (line > 0) {
+            return line--;
           }
-        });
+        } else if (c === diamond.DOWN) {
+          if (line < lines.length - 1) {
+            return line++;
+          }
+        } else if (c === diamond.CR) {
+          return after_fixing_cursor(function() {
+            var new_line;
+            new_line = lines[line].splice(col, lines[line].length - col);
+            lines.splice(++line, 0, new_line);
+            return col = 0;
+          });
+        } else {
+          return after_fixing_cursor(function() {
+            return lines[line].splice(++col - 1, 0, c);
+          });
+        }
       },
       cursor: fixed_cursor,
-      displace_col: function(dc) {
-        return after_fixing_cursor(function() {
-          return col += dc;
-        });
-      },
       set_cursor: function(l, c) {
         var _ref;
         return _ref = [l, c], line = _ref[0], col = _ref[1], _ref;
+      },
+      move_cursor_to_end_of_line: function() {
+        return after_fixing_cursor(function() {
+          return col = lines[line].length - 1 + col_max_adjustment;
+        });
+      },
+      move_cursor_to_beginning_of_line: function() {
+        return after_fixing_cursor(function() {
+          return col = 0;
+        });
       },
       allow_cursor_eol: function(allow) {
         return col_max_adjustment = allow ? 1 : 0;
@@ -62,11 +95,38 @@ exports.create = function() {
             _results.push(l.join(''));
           }
           return _results;
-        })()).join('');
+        })()).join('\n');
       },
-      x: function() {
+      delete_at_cursor: function(_arg) {
+        var dc, dl;
+        dl = _arg[0], dc = _arg[1];
         return after_fixing_cursor(function() {
-          return lines[line].splice(col, 1);
+          var _ref, _ref1;
+          if (dl !== null) {
+            if (line + dl < 0) {
+              return;
+            }
+            if (line + dl > lines.length) {
+              return;
+            }
+            if (dl < 0) {
+              _ref = [line + dl, Math.abs(dl)], line = _ref[0], dl = _ref[1];
+            }
+            lines.splice(line, dl + 1);
+            line = Math.min(line, lines.length - 1);
+            return col = 0;
+          } else {
+            if (col + dc < 0) {
+              return;
+            }
+            if (col + dc > lines[line].length + col_max_adjustment) {
+              return;
+            }
+            if (dc < 0) {
+              _ref1 = [col + dc, Math.abs(dc)], col = _ref1[0], dc = _ref1[1];
+            }
+            return lines[line].splice(col, dc);
+          }
         });
       }
     });
@@ -180,33 +240,55 @@ exports.create = function() {
   omap_ = function(keys, cob) {
     return bindings_.map(bindings_.concat(['omap_'], keys), cob);
   };
-  (function() {
-    return omap_('h', function() {
-      return -1;
-    });
-  })();
+  omap_is_prefix_ = function(keys) {
+    return bindings_.is_prefix(bindings_.concat(['omap_'], keys));
+  };
   modes_.onchange(function(old_mode, new_mode) {
     if (old_mode === modes_.INSERT && new_mode === modes_.NORMAL) {
-      contents_.displace_col(-1);
+      contents_.insert_char(diamond.LEFT);
     }
     return contents_.allow_cursor_eol(new_mode === modes_.INSERT);
   });
-  type_ = (function() {
-    var prefix;
+  _ref = (function() {
+    var HANDLED, IS_PREFIX, UNHANDLED, already_typing, pending, prefix, to_type, type, type_unshift, with_movement;
+    HANDLED = 'pending:handled';
+    IS_PREFIX = 'pending:not_handled_but_is_prefix';
+    UNHANDLED = 'pending:unhandled_and_is_not_prefix';
+    to_type = [];
     prefix = [];
-    return function(keys) {
-      var cob, k, not_known_prefix, _i, _len, _ref, _results;
+    pending = [];
+    already_typing = false;
+    type = function(keys) {
+      var cob, k, not_known_prefix, p, p_result, _i, _j, _len, _len1, _ref;
       _ref = diamond.tokenize(keys);
-      _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         k = _ref[_i];
-        prefix.push(k);
+        to_type.push(k);
+      }
+      if (already_typing) {
+        return;
+      }
+      already_typing = true;
+      while (to_type.length > 0) {
+        prefix.push(to_type.shift());
         not_known_prefix = !modes_.current().is_prefix(prefix);
         cob = modes_.current().map(prefix);
-        if (cob != null) {
-          prefix = [];
-          cob();
+        for (_j = 0, _len1 = pending.length; _j < _len1; _j++) {
+          p = pending[_j];
+          p_result = p();
+          if (p_result === HANDLED) {
+            prefix = [];
+            pending = [];
+            cob = null;
+            break;
+          } else if (p_result === IS_PREFIX) {
+            not_known_prefix = false;
+          }
+        }
+        if ((cob != null) && cob() !== false) {
           not_known_prefix = false;
+          prefix = [];
+          pending = [];
         }
         if (prefix.length !== 0 && modes_.current().NAME === modes_.INSERT) {
           assert.equal(1, prefix.length);
@@ -214,35 +296,97 @@ exports.create = function() {
           not_known_prefix = false;
         }
         if (not_known_prefix) {
-          _results.push(prefix = []);
-        } else {
-          _results.push(void 0);
+          prefix = [];
+          pending = [];
         }
       }
-      return _results;
+      return already_typing = false;
     };
-  })();
+    type_unshift = function(keys) {
+      to_type = diamond.tokenize(keys).concat(to_type);
+      return type('');
+    };
+    with_movement = function(cob) {
+      var pending_length, pending_queue_length;
+      pending_length = prefix.length;
+      pending_queue_length = pending.length;
+      pending.push(function() {
+        var movement_cob, remainder;
+        remainder = prefix.slice(pending_length);
+        movement_cob = omap_(remainder);
+        if (movement_cob != null) {
+          cob(movement_cob());
+          return HANDLED;
+        } else if (omap_is_prefix_(remainder)) {
+          return IS_PREFIX;
+        } else {
+          return UNHANDLED;
+        }
+      });
+      return false;
+    };
+    return [type_unshift, type, with_movement];
+  })(), type_unshift_ = _ref[0], type_ = _ref[1], with_movement_ = _ref[2];
   (function() {
-    var displace_col, imap, insert_char, nmap, set_cursor, x;
-    nmap = modes_.nmap, imap = modes_.imap;
-    displace_col = contents_.displace_col, set_cursor = contents_.set_cursor, insert_char = contents_.insert_char, x = contents_.x;
-    nmap('a', function() {
-      return type_('i<right>');
+    var delete_at_cursor, imap, insert_char, nmap, omap, set_cursor;
+    nmap = function(keys, cob) {
+      if (typeof cob === 'string') {
+        cob = (function(cob) {
+          return function() {
+            return type_unshift_(cob);
+          };
+        })(cob);
+      }
+      return modes_.nmap(keys, cob);
+    };
+    imap = modes_.imap;
+    set_cursor = contents_.set_cursor, insert_char = contents_.insert_char, delete_at_cursor = contents_.delete_at_cursor;
+    omap = omap_;
+    nmap('a', 'i<right>');
+    nmap('A', '$a');
+    nmap('$', function() {
+      return contents_.move_cursor_to_end_of_line();
     });
+    nmap('0', function() {
+      return contents_.move_cursor_to_beginning_of_line();
+    });
+    nmap('o', 'A<cr>');
+    nmap('O', '0i<cr><up>');
     nmap('h', function() {
-      return displace_col(-1);
+      return insert_char(diamond.LEFT);
+    });
+    omap('h', function() {
+      return [null, -1];
     });
     nmap('l', function() {
-      return displace_col(+1);
+      return insert_char(diamond.RIGHT);
     });
-    nmap('x', function() {
-      return x();
+    omap('l', function() {
+      return [null, +1];
     });
+    nmap('j', function() {
+      return insert_char(diamond.DOWN);
+    });
+    omap('j', function() {
+      return [+1, 0];
+    });
+    nmap('k', function() {
+      return insert_char(diamond.UP);
+    });
+    omap('k', function() {
+      return [-1, 0];
+    });
+    nmap('x', 'dl');
     nmap('gg', function() {
       return set_cursor(0, 0);
     });
-    return imap('<right>', function() {
-      return displace_col(+1);
+    omap('gg', function() {
+      return [-contents_.cursor()[0], 0];
+    });
+    return nmap('d', function() {
+      return with_movement_(function(m) {
+        return delete_at_cursor(m);
+      });
     });
   })();
   return {

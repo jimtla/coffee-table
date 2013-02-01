@@ -7,7 +7,10 @@ keys = {
   CR: '\n',
   ESC: '<ESC>',
   LEFT: '<LEFT>',
-  RIGHT: '<RIGHT>'
+  RIGHT: '<RIGHT>',
+  BS: '<BS>',
+  UP: '<UP>',
+  DOWN: '<DOWN>'
 };
 
 for (k in keys) {
