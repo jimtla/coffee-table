@@ -5,7 +5,9 @@ keys = {
   GT: '>',
   LT: '<',
   CR: '\n',
-  ESC: '<ESC>'
+  ESC: '<ESC>',
+  LEFT: '<LEFT>',
+  RIGHT: '<RIGHT>'
 };
 
 for (k in keys) {

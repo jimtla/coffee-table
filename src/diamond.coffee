@@ -3,6 +3,8 @@ keys =
   LT: '<'
   CR: '\n'
   ESC: '<ESC>'
+  LEFT: '<LEFT>'
+  RIGHT: '<RIGHT>'
 
 exports[k] = v for k, v of keys
 

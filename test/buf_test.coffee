@@ -10,8 +10,8 @@ describe 'buf', ->
   contents = (s) -> assert.equal s, b.contents()
   cursor = (l, c) -> assert.deepEqual [l, c], b.cursor()
 
-  normal = 'n'
-  insert = 'i'
+  normal = 'NORMAL'
+  insert = 'INSERT'
   mode = (m) -> assert.equal m, b.mode()
 
   it 'starts out empty in normal mode', ->
@@ -47,6 +47,7 @@ describe 'buf', ->
     contents 'coffee\ntable treble'
     cursor 1, 9
     type '<esc>'
+    mode normal
     cursor 1, 8
 
   it 'correctly handles newlines and insert/append near boundaries', ->
@@ -86,6 +87,16 @@ describe 'buf', ->
     contents 'stevie\n'
     type 'xxxx'
     contents 'stevie\n'
+
+  it 'can handle multicharacter commands such as `gg`', ->
+    type 'ihi<esc>'
+    cursor 0, 1
+    type 'gg'
+    cursor 0, 0
+    type 'ihello\nworld<esc>ggz}l'
+    cursor 0, 1
+    type 'z}gg'
+    cursor 0, 0
 
   it 'can delete movements with `d <movement>`', ->
     type 'iheLlo<esc>hhdh'
