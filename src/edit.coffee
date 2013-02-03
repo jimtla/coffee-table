@@ -16,7 +16,7 @@ module.exports = (app) ->
     app.get /^\/edit\/(.*)/ , (req, res) ->
         file = req.params[0]
         target = make_absolute file
-        if target?  
+        if target?
             readFile = -> fs.readFile target, (err, contents) ->
                 if err
                     if err.code == 'ENOENT' # File not found
@@ -31,7 +31,7 @@ module.exports = (app) ->
                         if err
                             readFile()
                         else
-                            res.send 200, files
+                            res.render 'folder', {target, files}
                 else
                     readFile()
         else

@@ -49,7 +49,10 @@ module.exports = function(app) {
             if (err) {
               return readFile();
             } else {
-              return res.send(200, files);
+              return res.render('folder', {
+                target: target,
+                files: files
+              });
             }
           });
         } else {
