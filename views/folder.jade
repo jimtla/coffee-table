@@ -1,0 +1,7 @@
+extends layout
+block content
+    .container
+        h3 File Listing for #{target}
+        -each file in files
+            .file
+                a(href=file)=file
