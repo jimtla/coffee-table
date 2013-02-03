@@ -1,3 +1,32 @@
+app.add_module 'diamond', ->
+    BS: '<BS>'
+    CR: '<CR>'
+    DOWN: '<DOWN>'
+    ESC: '<ESC>'
+    LEFT: '<LEFT>'
+    RIGHT: '<RIGHT>'
+    UP: '<UP>'
+app.add_module 'input', ->
+    grab_focus: do ->
+        keydown_map =
+            8: app.diamond.BS
+            13: app.diamond.CR
+            27: app.diamond.ESC
+            37: app.diamond.LEFT
+            38: app.diamond.UP
+            39: app.diamond.RIGHT
+            40: app.diamond.DOWN
+        (node, cob) ->
+            node.focus()
+            node.on 'keydown keypress', (e) ->
+                if e.which is 0 or (keydown_map[e.which]? ^ e.type is 'keydown')
+                    true
+                else
+                    cob
+                        diamond: keydown_map[e.which] ? String.fromCharCode e.which
+    regrab_focus: (node) ->
+        node.focus()
+
 app.add_module 'editor', ->
     normalize_cursor = (state, {normalize_line, normalize_col} = {}) ->
         # Make sure the cursor is between 0 and EOL, and the line is in the buffer
@@ -173,18 +202,8 @@ app.add_module 'editor', ->
         exec_container.show()
         exec = exec_container.find '.exec'
         exec.val content
-        exec.focus()
+        app.input.regrab_focus exec
         state
-
-    # A movement is a mapping from modifiers to scan codes to functions from a
-    # state to a new cursor position.
-    movements =
-        keys:
-            o:
-                37: move_cursor {lines:  0, cols: -1}
-                38: move_cursor {lines: -1, cols:  0}
-                39: move_cursor {lines:  0, cols:  1}
-                40: move_cursor {lines:  1, cols:   0}
 
     delete_to_cursor = (state, target_cursor) ->
         if state.cursor.line == target_cursor.line
@@ -228,7 +247,9 @@ app.add_module 'editor', ->
     # An action_group is a mapping from key codes to "actions", and a list
     # of included action_groups.
     action_groups =
-        movement: movements
+        # A movement is a mapping from modifiers to scan codes to functions from a
+        # state to a new cursor position.
+        movement: {}
         repeat_number:
             keys: {}
             subgroups: {}
@@ -239,9 +260,11 @@ app.add_module 'editor', ->
                     make_state state, {cursor}
                 repeat_number: (o, state) -> state
         insert:
-            o:
-                8 : delete_chars_at_cursor {count: -1}
-                13: break_line_at_cursor
+            catchall: (state, repeat_number, actual_repeat_number, key) ->
+                switch key.diamond
+                    when app.diamond.BS then (delete_chars_at_cursor {count: -1}) state
+                    when app.diamond.CR then break_line_at_cursor state
+                    else (insert_string_at_cursor {string: key.diamond}) state
         delete:
             keys: {}
             subgroups:
@@ -255,63 +278,24 @@ app.add_module 'editor', ->
                 repeat_number: (o, state) -> state
             catchall: enter_mode 'command'
 
-    modifiers_to_string = (modifiers) ->
-        'o' + (for key in ['ctrl', 'alt', 'meta', 'shift']
-            if modifiers[key]
-                key[0]
-            else
-                ''
-        ).join ''
-
-    action_of_key = (mode, scan_code, modifiers) ->
-        modifier_string = modifiers_to_string modifiers
-
-        action = action_groups[mode][modifier_string]?[scan_code]
+    action_of_key = (mode, key) ->
+        action = action_groups[mode]['o:key.diamond']?[key.diamond]
         if action?
             action
         else
             if action_groups[mode].subgroups?
                 for subgroup, wrapper of action_groups[mode].subgroups
                     console.log subgroup
-                    action = action_of_key subgroup, scan_code, modifiers
+                    action = action_of_key subgroup, key
                     if action?
-                        return (state, repeat_number, actual_repeat_number) ->
-                            wrapper state, action state, repeat_number, actual_repeat_number
+                        return (state, repeat_number, actual_repeat_number, key) ->
+                            wrapper state, action state, repeat_number, actual_repeat_number, key
             action_groups[mode].catchall
 
-    CHARACTERS =
-        "ESC": [{modifiers: {}, scan_code: 27}]
-
-    map_characters = (offset, modifiers, characters) ->
-        modifier_string = modifiers_to_string modifiers
-        action_groups.insert[modifier_string] ?= {}
-        for c, i in characters
-            CHARACTERS[c] ?= []
-            CHARACTERS[c].push
-                modifiers: modifiers
-                scan_code: offset + i
-
-            action_groups.insert[modifier_string][offset + i] =
-                insert_string_at_cursor {string: c}
-
-    map_characters 32, {}, " "
-    map_characters 48, {}, "0123456789"
-    map_characters 65, {}, "abcdefghijklmnopqrstuvwxyz"
-    map_characters 96, {}, "0123456789*+-./"
-    map_characters 186, {}, ";=,-./`"
-    map_characters 219, {}, "[\\]'"
-
-    map_characters 32, {shift: true}, " "
-    map_characters 48, {shift: true}, ")!@#$%^&*("
-    map_characters 65, {shift: true}, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    map_characters 186, {shift: true}, ":+<_>?~"
-    map_characters 219, {shift: true}, "{|}\""
-
-    register_command = (mode, character, command) ->
-        for {modifiers, scan_code} in CHARACTERS[character]
-            action_groups[mode] ?= {}
-            action_groups[mode][modifiers_to_string modifiers] ?= {}
-            action_groups[mode][modifiers_to_string modifiers][scan_code] = command
+    register_command = (mode, key, command) ->
+        action_groups[mode] ?= {}
+        action_groups[mode]['o:key.diamond'] ?= {}
+        action_groups[mode]['o:key.diamond'][key] = command
 
     register_command 'command', ':', open_exec ':'
     register_command 'command', 'i', insert 'before'
@@ -332,7 +316,12 @@ app.add_module 'editor', ->
     register_command 'movement', 'k', move_cursor {lines: -1, cols:  0}
     register_command 'movement', 'G', move_cursor_end_of_file
 
-    register_command 'insert' , 'ESC', enter_mode 'command'
+    register_command 'movement', app.diamond.LEFT, move_cursor {lines:  0, cols: -1}
+    register_command 'movement', app.diamond.UP, move_cursor {lines: -1, cols:  0}
+    register_command 'movement', app.diamond.RIGHT, move_cursor {lines:  0, cols:  1}
+    register_command 'movement', app.diamond.DOWN, move_cursor {lines:  1, cols:   0}
+
+    register_command 'insert' , '<ESC>', enter_mode 'command'
 
     push_repeat_number = (number) -> (state, o, repeat_number) ->
         make_state state,
@@ -405,15 +394,9 @@ app.add_module 'editor', ->
             else if cursor_top > scroll_top + window_height - padding
                 $(window).scrollTop cursor_top + padding - window_height
 
-        node.focus()
-        node.on 'keydown', (e) ->
-            $('.last-keypress').text e.which
-            action = action_of_key state.mode, e.which,
-                alt: e.altKey
-                ctrl: e.ctrlKey
-                meta: e.metaKey
-                shift: e.shiftKey
-
+        app.input.grab_focus node, (key) ->
+            $('.last-keypress').text JSON.stringify key
+            action = action_of_key state.mode, key
             if action?
                 actual_repeat_number = state.repeat_number
                 repeat_number =
@@ -423,7 +406,7 @@ app.add_module 'editor', ->
                         actual_repeat_number
 
                 state = make_state state, { repeat_number: 0 }
-                state = action state, repeat_number, actual_repeat_number
+                state = action state, repeat_number, actual_repeat_number, key
                 save state
                 do refresh
                 do scroll_to_cursor
@@ -448,16 +431,17 @@ app.add_module 'editor', ->
             exec = exec_container.find '.exec'
             close_exec = ->
                 exec_container.hide()
-                node.focus()
+                app.input.regrab_focus node
 
-            exec.on 'keydown', (e) ->
-                if e.which == 13 # Enter
-                    state = execute exec.val(), state
-                    do refresh
-                    do scroll_to_cursor
-                    do close_exec
-                else if e.which == 27 # Escape
-                    do close_exec
+            app.input.grab_focus exec, (key) ->
+                switch (key.diamond)
+                    when app.diamond.CR
+                        state = execute exec.val(), state
+                        do refresh
+                        do scroll_to_cursor
+                        do close_exec
+                    when app.diamond.ESC
+                        do close_exec
 
 
     { start_editing }
