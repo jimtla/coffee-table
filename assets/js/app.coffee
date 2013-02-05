@@ -30,10 +30,11 @@ app.add_module 'grab_focus', ->
         if callback?
             $(node).data FIRST_CALL_FOR_NODE, true
             node.on 'keydown keypress', (e) ->
-                input_check =
+                not_yet_implemented = e.ctrlKey or e.altKey or e.metaKey
+                good_input =
                     keydown: keydown_keycode_map[e.keyCode]?
                     keypress: e.charCode isnt 0
-                unless input_check[e.type]
+                if not_yet_implemented or not good_input[e.type]
                     true
                 else
                     callback keydown_keycode_map[e.keyCode] ? String.fromCharCode e.charCode
