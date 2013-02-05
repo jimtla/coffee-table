@@ -1,4 +1,4 @@
-app.add_module 'diamond', ->
+app.add_module 'keys', ->
     BS: '<BS>'
     CR: '<CR>'
     DOWN: '<DOWN>'
@@ -6,26 +6,28 @@ app.add_module 'diamond', ->
     LEFT: '<LEFT>'
     RIGHT: '<RIGHT>'
     UP: '<UP>'
-app.add_module 'input', ->
-    grab_focus: do ->
-        keydown_map =
-            8: app.diamond.BS
-            13: app.diamond.CR
-            27: app.diamond.ESC
-            37: app.diamond.LEFT
-            38: app.diamond.UP
-            39: app.diamond.RIGHT
-            40: app.diamond.DOWN
-        (node, cob) ->
-            node.focus()
+app.add_module 'grab_focus', ->
+    keydown_map =
+        8: app.keys.BS
+        13: app.keys.CR
+        27: app.keys.ESC
+        37: app.keys.LEFT
+        38: app.keys.UP
+        39: app.keys.RIGHT
+        40: app.keys.DOWN
+    FIRST_CALL_FOR_NODE = 'app.grab_focus:first_call_for_node'
+    (node, callback) ->
+        node = $(node)
+        unless callback? ^ node.data(FIRST_CALL_FOR_NODE)
+            throw new Error '1st (and only 1st) call to grab_focus needs a callback'
+        node.focus()
+        if callback?
+            $(node).data FIRST_CALL_FOR_NODE, true
             node.on 'keydown keypress', (e) ->
                 if e.which is 0 or (keydown_map[e.which]? ^ e.type is 'keydown')
                     true
                 else
-                    cob
-                        diamond: keydown_map[e.which] ? String.fromCharCode e.which
-    regrab_focus: (node) ->
-        node.focus()
+                    callback keydown_map[e.which] ? String.fromCharCode e.which
 
 app.add_module 'editor', ->
     normalize_cursor = (state, {normalize_line, normalize_col} = {}) ->
@@ -202,7 +204,7 @@ app.add_module 'editor', ->
         exec_container.show()
         exec = exec_container.find '.exec'
         exec.val content
-        app.input.regrab_focus exec
+        app.grab_focus exec
         state
 
     delete_to_cursor = (state, target_cursor) ->
@@ -250,9 +252,7 @@ app.add_module 'editor', ->
         # A movement is a mapping from modifiers to scan codes to functions from a
         # state to a new cursor position.
         movement: {}
-        repeat_number:
-            keys: {}
-            subgroups: {}
+        repeat_number: {}
         command:
             keys: {}
             subgroups:
@@ -260,11 +260,12 @@ app.add_module 'editor', ->
                     make_state state, {cursor}
                 repeat_number: (o, state) -> state
         insert:
+            keys: {}
             catchall: (state, repeat_number, actual_repeat_number, key) ->
-                switch key.diamond
-                    when app.diamond.BS then (delete_chars_at_cursor {count: -1}) state
-                    when app.diamond.CR then break_line_at_cursor state
-                    else (insert_string_at_cursor {string: key.diamond}) state
+                switch key
+                    when app.keys.BS then (delete_chars_at_cursor {count: -1}) state
+                    when app.keys.CR then break_line_at_cursor state
+                    else (insert_string_at_cursor {string: key}) state
         delete:
             keys: {}
             subgroups:
@@ -279,13 +280,12 @@ app.add_module 'editor', ->
             catchall: enter_mode 'command'
 
     action_of_key = (mode, key) ->
-        action = action_groups[mode]['o:key.diamond']?[key.diamond]
+        action = action_groups[mode].keys?[key]
         if action?
             action
         else
             if action_groups[mode].subgroups?
                 for subgroup, wrapper of action_groups[mode].subgroups
-                    console.log subgroup
                     action = action_of_key subgroup, key
                     if action?
                         return (state, repeat_number, actual_repeat_number, key) ->
@@ -294,8 +294,8 @@ app.add_module 'editor', ->
 
     register_command = (mode, key, command) ->
         action_groups[mode] ?= {}
-        action_groups[mode]['o:key.diamond'] ?= {}
-        action_groups[mode]['o:key.diamond'][key] = command
+        action_groups[mode].keys ?= {}
+        action_groups[mode].keys[key] = command
 
     register_command 'command', ':', open_exec ':'
     register_command 'command', 'i', insert 'before'
@@ -316,10 +316,10 @@ app.add_module 'editor', ->
     register_command 'movement', 'k', move_cursor {lines: -1, cols:  0}
     register_command 'movement', 'G', move_cursor_end_of_file
 
-    register_command 'movement', app.diamond.LEFT, move_cursor {lines:  0, cols: -1}
-    register_command 'movement', app.diamond.UP, move_cursor {lines: -1, cols:  0}
-    register_command 'movement', app.diamond.RIGHT, move_cursor {lines:  0, cols:  1}
-    register_command 'movement', app.diamond.DOWN, move_cursor {lines:  1, cols:   0}
+    register_command 'movement', app.keys.LEFT, move_cursor {lines:  0, cols: -1}
+    register_command 'movement', app.keys.UP, move_cursor {lines: -1, cols:  0}
+    register_command 'movement', app.keys.RIGHT, move_cursor {lines:  0, cols:  1}
+    register_command 'movement', app.keys.DOWN, move_cursor {lines:  1, cols:   0}
 
     register_command 'insert' , '<ESC>', enter_mode 'command'
 
@@ -394,7 +394,7 @@ app.add_module 'editor', ->
             else if cursor_top > scroll_top + window_height - padding
                 $(window).scrollTop cursor_top + padding - window_height
 
-        app.input.grab_focus node, (key) ->
+        app.grab_focus node, (key) ->
             $('.last-keypress').text JSON.stringify key
             action = action_of_key state.mode, key
             if action?
@@ -431,16 +431,16 @@ app.add_module 'editor', ->
             exec = exec_container.find '.exec'
             close_exec = ->
                 exec_container.hide()
-                app.input.regrab_focus node
+                app.grab_focus node
 
-            app.input.grab_focus exec, (key) ->
-                switch (key.diamond)
-                    when app.diamond.CR
+            app.grab_focus exec, (key) ->
+                switch (key)
+                    when app.keys.CR
                         state = execute exec.val(), state
                         do refresh
                         do scroll_to_cursor
                         do close_exec
-                    when app.diamond.ESC
+                    when app.keys.ESC
                         do close_exec
 
 
