@@ -7,14 +7,20 @@ app.add_module 'keys', ->
     RIGHT: '<RIGHT>'
     UP: '<UP>'
 app.add_module 'grab_focus', ->
-    keydown_map =
-        8: app.keys.BS
-        13: app.keys.CR
-        27: app.keys.ESC
-        37: app.keys.LEFT
-        38: app.keys.UP
-        39: app.keys.RIGHT
-        40: app.keys.DOWN
+    keydown_keycode_map = do ->
+        map = {}
+        mappings = [
+            [KeyboardEvent.DOM_VK_BACK_SPACE, app.keys.BS]
+            [KeyboardEvent.DOM_VK_RETURN, app.keys.CR]
+            [KeyboardEvent.DOM_VK_ESCAPE, app.keys.ESC]
+            [KeyboardEvent.DOM_VK_LEFT, app.keys.LEFT]
+            [KeyboardEvent.DOM_VK_UP, app.keys.UP]
+            [KeyboardEvent.DOM_VK_RIGHT, app.keys.RIGHT]
+            [KeyboardEvent.DOM_VK_DOWN, app.keys.DOWN]
+        ]
+        for [k, v] in mappings
+          map[k] = v
+        map
     FIRST_CALL_FOR_NODE = 'app.grab_focus:first_call_for_node'
     (node, callback) ->
         node = $(node)
@@ -24,10 +30,13 @@ app.add_module 'grab_focus', ->
         if callback?
             $(node).data FIRST_CALL_FOR_NODE, true
             node.on 'keydown keypress', (e) ->
-                if e.which is 0 or (keydown_map[e.which]? ^ e.type is 'keydown')
+                input_check =
+                    keydown: keydown_keycode_map[e.keyCode]?
+                    keypress: e.charCode isnt 0
+                unless input_check[e.type]
                     true
                 else
-                    callback keydown_map[e.which] ? String.fromCharCode e.which
+                    callback keydown_keycode_map[e.keyCode] ? String.fromCharCode e.charCode
 
 app.add_module 'editor', ->
     normalize_cursor = (state, {normalize_line, normalize_col} = {}) ->
