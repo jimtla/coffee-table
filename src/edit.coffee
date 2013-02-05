@@ -18,20 +18,22 @@ module.exports = (app) ->
         target = make_absolute file
         if target?
             readFile = -> fs.readFile target, (err, contents) ->
+                base_path = "/edit/#{file}".replace /\/[^\/]*$/, '/'
                 if err
                     if err.code == 'ENOENT' # File not found
-                        res.render 'edit', {file, contents: ''}
+                        res.render 'edit', {base_path, file, contents: ''}
                     else
                         res.send 400, err
                 else
-                    res.render 'edit', {file, contents}
+                    res.render 'edit', {base_path, file, contents}
             fs.stat target, (err, stat) ->
                 if not err and stat.isDirectory()
                     fs.readdir target, (err, files) ->
                         if err
                             readFile()
                         else
-                            res.render 'folder', {target, files}
+                            base_path = "/edit/#{file}/".replace /\/\//g, "/"
+                            res.render 'folder', {target, base_path, files}
                 else
                     readFile()
         else
