@@ -1,3 +1,8 @@
+app = (window ? exports).app ?= add_module: (name, module) -> app[name] = module()
+_ = (window ? exports)._ ?= debounceR: ->
+$ = (window ? exports).$ ?= ->
+KeyboardEvent = (window ? exports).KeyboardEvent ?= {}
+
 app.add_module 'keys', ->
     BS: '<BS>'
     CR: '<CR>'
@@ -6,6 +11,12 @@ app.add_module 'keys', ->
     LEFT: '<LEFT>'
     RIGHT: '<RIGHT>'
     UP: '<UP>'
+    ctrl: (key) ->
+        key = key.toUpperCase()
+        unless /^[^<]$/.test(key) or /^<(C-)?[A-Z]+>$/.test(key)
+            throw new Error("bad key #{key}")
+        return key if /^<C-[A-Z]+>$/.test key
+        "<C-#{key.replace(/^</, '').replace(/>$/, '')}>"
 app.add_module 'grab_focus', ->
     keydown_keycode_map = do ->
         map = {}
