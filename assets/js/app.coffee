@@ -41,14 +41,16 @@ app.add_module 'grab_focus', ->
         if callback?
             $(node).data FIRST_CALL_FOR_NODE, true
             node.on 'keydown keypress', (e) ->
-                not_yet_implemented = e.ctrlKey or e.altKey or e.metaKey
+                not_yet_implemented = e.altKey or e.metaKey
                 good_input =
                     keydown: keydown_keycode_map[e.keyCode]?
                     keypress: e.charCode isnt 0
                 if not_yet_implemented or not good_input[e.type]
                     true
                 else
-                    callback keydown_keycode_map[e.keyCode] ? String.fromCharCode e.charCode
+                    key = keydown_keycode_map[e.keyCode] ? String.fromCharCode e.charCode
+                    key = app.keys.ctrl key if e.ctrlKey
+                    callback key
 
 app.add_module 'editor', ->
     normalize_cursor = (state, {normalize_line, normalize_col} = {}) ->
@@ -335,6 +337,8 @@ app.add_module 'editor', ->
     register_command 'movement', 'l', move_cursor {lines:  0, cols:  1}
     register_command 'movement', 'j', move_cursor {lines:  1, cols:  0}
     register_command 'movement', 'k', move_cursor {lines: -1, cols:  0}
+    register_command 'movement', '<C-U>', move_cursor {lines: -20, cols: 0}
+    register_command 'movement', '<C-D>', move_cursor {lines: 20, cols: 0}
     register_command 'movement', 'G', move_cursor_end_of_file
 
     register_command 'movement', app.keys.LEFT, move_cursor {lines:  0, cols: -1}
