@@ -4,7 +4,7 @@ module.exports = (app) ->
     app.get '/' , (req, res) ->
         res.render 'index', {action: 'Do Something!'}
 
-    WORKING_DIRECTORY = path.resolve './'
+    WORKING_DIRECTORY = path.resolve process.env.CT_EDITABLE_ROOT ? './'
 
     make_absolute = (file) ->
         target = path.join WORKING_DIRECTORY, file
